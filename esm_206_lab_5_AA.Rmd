@@ -9,22 +9,63 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Objectives:
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+- Getting counts for different groups
+- Use {lubridate} to parse dates
+- Find confidence intervals & do t-tests with t.test()
+- Heatmap with geom_tile()
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
+#### Attach packages
+```{r, include = FALSE}
+
+library(tidyverse)
+library(here)
+library(tidyr)
+library(janitor)
+
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+####  read in lobster data
+```{r}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+lobster_abundance <- read_csv(here::here("data", "lobster_abundance.csv"),
+                              na = "-99999") %>% # automatically replaces the na placeholder in this data frame with NA instead
+  clean_names() # take variable names out of CAPSLOCK and into snake_case
+
+View(lobster_abundance)
 ```
+This table is a frequency table. Tidy format data is in case format, which eliminates the need to weight other stats by the count of each variable in a frequency table. 
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+First, expand the amounts in the 'count' column using the uncount() function in tidyr
+```{r}
+lobster_tidy <- lobster_abundance %>%
+  tidyr::uncount(lobster_count) 
+```
+Now each lobster (i.e., each observation) has its own row. Tidy!!
+
+
+
+Let's look at this some different ways:
+```{r}
+
+View(lobster_tidy)
+
+# Jitter plot of lobster size for each different site
+ggplot(data = lobster_tidy, aes(x = site)) +
+  geom_jitter()
+
+ggplot(data = lobster_tidy, aes(x = size_mm)) +
+  geom_histogram(aes(fill = site)) +
+  facet_wrap(~site, scales = "free") # THIS IS IMPORTANT
+
+
+# make a Q-Q plot to check normality of lobster size data
+ggplot(data = lobster_tidy, aes(sample = size_mm)) +
+  geom_qq() +
+facet_wrap(~site, scales = "free") 
+
+
+```
