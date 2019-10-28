@@ -35,7 +35,6 @@ lobster_abundance <- read_csv(here::here("data", "lobster_abundance.csv"),
                               na = "-99999") %>% # automatically replaces the na placeholder in this data frame with NA instead
   clean_names() # take variable names out of CAPSLOCK and into snake_case
 
-View(lobster_abundance)
 ```
 This table is a frequency table. Tidy format data is in case format, which eliminates the need to weight other stats by the count of each variable in a frequency table. 
 
@@ -51,11 +50,11 @@ Now each lobster (i.e., each observation) has its own row. Tidy!!
 Let's look at this some different ways:
 ```{r}
 
-View(lobster_tidy)
+#View(lobster_tidy)
 
 # Jitter plot of lobster size for each different site
-ggplot(data = lobster_tidy, aes(x = site)) +
-  geom_jitter()
+# ggplot(data = lobster_tidy, aes(x = site)) +
+  # geom_jitter()
 
 ggplot(data = lobster_tidy, aes(x = size_mm)) +
   geom_histogram(aes(fill = site)) +
@@ -69,3 +68,120 @@ facet_wrap(~site, scales = "free")
 
 
 ```
+
+
+
+
+The date is currently stored as a character. Here we use {lubridate} to change that.
+
+I'm going to add a new column with 'mutate()' that contains my date as an actual date
+```{r}
+
+
+lobster_date <- lobster_tidy %>%
+  mutate(
+    date_new = lubridate::mdy(date)
+  )
+
+```
+
+
+Now parse the 'Date' column to get the different pieces (month, year) separated
+```{r}
+
+lobster_parse_date <- lobster_date %>%
+  mutate(
+    obs_month = lubridate::month(date_new, label = TRUE), # the 'month' argument pulls out the month from the full date, and the 'label' argument writes in month names rather than month numbers
+    obs_year = lubridate::year(date_new)
+  )
+  
+  
+```
+
+
+
+Count lobsters by different groupings....
+
+Starting with number of lobsters by year and month
+```{r}
+
+lobster_ym <- lobster_parse_date %>%
+  count(obs_year, obs_month) # count is great for categorical data in tidy format
+
+
+lobster_ysite <- lobster_parse_date %>%
+  count(obs_year, site)
+
+lobster_totsite <- lobster_parse_date %>%
+  count(site)
+
+
+
+# group_by + summarize + n()
+lobster_summary <- lobster_parse_date %>%
+  group_by(site) %>%
+  summarize(
+    mean_size = mean(size_mm, na.rm = TRUE),
+    sd_size = sd(size_mm, na.rm = TRUE),
+    sample_n = n()
+  )
+
+
+```
+
+
+
+Confidence intervals and t-tests:
+
+Use the 't.test()' function to find confidence intervals and perform t-tests
+```{r}
+
+ivee_lobsters <- lobster_tidy %>%
+  filter(site == "IVEE") %>%
+pull(size_mm) # the 'pull()' command creates a vector, which is useful for some operations. Using 'select()' creates a tbl_df with a single column.
+
+
+t.test(ivee_lobsters)
+```
+
+Two-sample t-tests:
+Is there a significant difference in mean lobster lengths between Naples reef and Mohawk reef?
+
+```{r}
+
+napl_sample <- lobster_tidy %>%
+  filter(site == "NAPL") %>%
+  pull(size_mm)
+
+mohk_sample <- lobster_tidy %>%
+  filter(site == "MOHK") %>%
+  pull(size_mm)
+
+
+mohk_napl_ttest <- t.test(napl_sample, mohk_sample)
+mohk_napl_ttest
+
+```
+
+Mean lobster size differed significantly between Mohawk and Naples reefs (t(`r mohk_napl_ttest$parameter`))
+
+
+Maybe an easier way....
+```{r}
+
+lobster_2sample <- lobster_tidy %>%
+  filter(site %in% c("NAPL", "MOHK"))
+
+ttest_2 <- t.test(size_mm ~ site, data = lobster_2sample) # careful though, this only works if your data contains only two groups
+
+ttest_2 #same results as napl_mohk_ttest
+```
+
+Now let's make a geom_tile() heatmap
+
+```{r}
+
+ggplot(data = lobster_ysite, aes(x = obs_year, y = site)) +
+  geom_tile(aes(fill = n))
+```
+
